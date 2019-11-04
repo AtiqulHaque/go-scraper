@@ -1,1 +1,1 @@
-# go-scraper
+# Very simple web scraper written by golang.
