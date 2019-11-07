@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"golang.org/x/net/html"
@@ -17,9 +18,10 @@ func main() {
 	}
 
 	url := os.Args[1]
-	url = "https://" + url // We "parse" our URL.
+	url = "http://" + url // We "parse" our URL.
 
 	req, err := http.NewRequest(http.MethodGet, url, nil)
+
 	if err != nil {
 		log.Printf("while creating a new request for %q: %v", url, err)
 		os.Exit(1)
@@ -45,24 +47,33 @@ func main() {
 	}
 
 	links := findLinks(nil, doc)
-
+	c := make(chan string)
 	for _, l := range links {
-		fl := formatURL(url, l) // Our formatted link
-		req, err := http.NewRequest(http.MethodGet, fl, nil)
-		if err != nil {
-			log.Printf("while creating a new request for %q: %v", fl, err)
-			continue
-		}
-
-		resp, err := client.Do(req)
-		if err != nil {
-			log.Printf("while making request to %q: %v", fl, err)
-			continue
-		}
-		defer resp.Body.Close()
-
-		fmt.Println(resp.StatusCode, fl)
+		go sendRequest(c, url, l)
 	}
+
+	for val := range c {
+		fmt.Println(val)
+	}
+
+	fmt.Println("main() stopped")
+}
+
+func sendRequest(c chan string, url string, l string) {
+
+	fl := formatURL(url, l) // Our formatted link
+	req, err := http.NewRequest(http.MethodGet, fl, nil)
+	if err != nil {
+		log.Printf("while creating a new request for %q: %v", fl, err)
+	}
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("while making request to %q: %v", fl, err)
+	}
+	defer resp.Body.Close()
+
+	c <- strconv.Itoa(resp.StatusCode) + " :::: " + fl
 }
 
 func findLinks(links []string, n *html.Node) []string {
